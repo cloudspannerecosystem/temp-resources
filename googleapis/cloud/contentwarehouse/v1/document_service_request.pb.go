@@ -471,7 +471,7 @@ type SearchDocumentsRequest struct {
 	//
 	// * Histogram facet (aka filterable properties): Facet names with format
 	// &lt;schema id&gt;.&lt;facet&gt;. Facets will have the
-	// format of: [a-zA-Z][a-zA-Z0-9_:/-.]. If the facet is a child
+	// format of: `[a-zA-Z][a-zA-Z0-9_:/-.]`. If the facet is a child
 	// facet, then the parent hierarchy needs to be specified separated by
 	// dots in the prefix after the schema id. Thus, the format for a multi-
 	// level facet is: &lt;schema id&gt;.&lt;parent facet name&gt;.
@@ -492,7 +492,9 @@ type SearchDocumentsRequest struct {
 	// Optional. Controls if the search document request requires the return of a total size
 	// of matched documents. See [SearchDocumentsResponse.total_size][google.cloud.contentwarehouse.v1.SearchDocumentsResponse.total_size].
 	//
-	// Enabling this flag may adversely impact performance.
+	// Enabling this flag may adversely impact performance. Hint: If this is
+	// used with pagination, set this flag on the initial query but set this
+	// to false on subsequent page calls (keep the total count locally).
 	//
 	// Defaults to false.
 	RequireTotalSize bool `protobuf:"varint,10,opt,name=require_total_size,json=requireTotalSize,proto3" json:"require_total_size,omitempty"`
