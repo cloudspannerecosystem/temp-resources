@@ -144,7 +144,9 @@ func QueryRecord(ctx context.Context, w io.Writer, dsn string) error {
 
 	r = Result{}
 	// Raw SQL
-	db.Raw("SELECT name, age FROM singers WHERE name = ?", "jinzhu_2").Scan(&r)
+	if err := db.Raw("SELECT name, age FROM singers WHERE name = ?", "jinzhu_2").Scan(&r).Error; err != nil {
+		return err
+	}
 	fmt.Fprintf(w, "record with name jinzhu_2 %+v\n", r)
 	return nil
 }

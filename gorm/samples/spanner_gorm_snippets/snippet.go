@@ -20,6 +20,7 @@ var (
 		"query_record":  samples.QueryRecord,
 		"associations":  samples.Association,
 		"transaction":   samples.Transactions,
+		"mutations":     samples.Mutations,
 
 		"mysql_migrate_model": samples.MYSQLMigrateModel,
 		"mysql_create_record": samples.MySQLCreateRecord,
