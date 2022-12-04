@@ -14,7 +14,7 @@ import (
 	"cloud.google.com/go/spanner"
 	spannerdriver "github.com/googleapis/go-sql-spanner"
 
-	spannergorm "github.com/rahul2393/go-spanner-orm/gorm"
+	spannergorm "github.com/cloudspannerecosystem/go-spanner-orm/gorm"
 )
 
 func Mutations(ctx context.Context, w io.Writer, dsn string) error {

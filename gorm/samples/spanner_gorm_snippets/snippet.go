@@ -8,7 +8,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/rahul2393/go-spanner-orm/gorm/samples"
+	"github.com/cloudspannerecosystem/go-spanner-orm/gorm/samples"
 )
 
 type command func(ctx context.Context, w io.Writer, dsn string) error

@@ -14,8 +14,8 @@ import (
 
 	_ "github.com/googleapis/go-sql-spanner"
 
-	spannergorm "github.com/rahul2393/go-spanner-orm/gorm"
-	"github.com/rahul2393/go-spanner-orm/gorm/samples/models"
+	spannergorm "github.com/cloudspannerecosystem/go-spanner-orm/gorm"
+	"github.com/cloudspannerecosystem/go-spanner-orm/gorm/samples/models"
 )
 
 // CreateRecord created a record in DB
