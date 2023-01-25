@@ -21,6 +21,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -31,6 +32,7 @@ import (
 	"cloud.google.com/go/kms/apiv1/kmspb"
 	"cloud.google.com/go/spanner"
 	database "cloud.google.com/go/spanner/admin/database/apiv1"
+	"cloud.google.com/go/spanner/admin/database/apiv1/databasepb"
 	instance "cloud.google.com/go/spanner/admin/instance/apiv1"
 	"github.com/GoogleCloudPlatform/golang-samples/internal/testutil"
 	"github.com/google/uuid"
@@ -43,6 +45,7 @@ import (
 
 type sampleFunc func(w io.Writer, dbName string) error
 type sampleFuncWithContext func(ctx context.Context, w io.Writer, dbName string) error
+type sampleProtoFuncWithContext func(ctx context.Context, w io.Writer, r io.Reader, dbName string) error
 type instanceSampleFunc func(w io.Writer, projectID, instanceID string) error
 type backupSampleFunc func(ctx context.Context, w io.Writer, dbName, backupID string) error
 type backupSampleFuncWithoutContext func(w io.Writer, dbName, backupID string) error
@@ -385,7 +388,17 @@ func TestProtoSample(t *testing.T) {
 
 	_, dbName, cleanup := initTest(t, randomID())
 	defer cleanup()
-	dbName = "projects/span-cloud-testing/instances/go-int-test-proto-col-samples/databases/singer_proto_db"
+	//dbName = "projects/span-cloud-testing/instances/go-int-test-proto-col-samples/databases/singer_proto_db"
+	//dbName = "projects/span-cloud-testing/instances/harsha-test-gcloud/databases/singer_test"
+	//dbName = "projects/span-cloud-testing/instances/integration-test-proto-column/databases/int_test_proto_column_db"
+	//f, err := os.Open("/usr/local/google/home/sriharshach/github/Go/golang-samples-proto-support-v2/spanner/spanner_snippets/spanner/testdata/protos/descriptors.pb")
+	file, err := os.Open(filepath.Join("testdata", "protos", "descriptors.pb"))
+	if err != nil {
+		panic(err)
+	}
+	defer file.Close()
+
+	mustRunProtoSample(t, createDatabaseWithProtoDescriptor, file, dbName, "failed to create db")
 
 	var out string
 	out = runSample(t, insertDataWithProtoMsgAndEnum, dbName, "failed to insert data with proto message and enum")
@@ -409,7 +422,10 @@ func TestProtoSample(t *testing.T) {
 	out = runSample(t, deleteDataWithProtoMsgAndEnumUsingDML, dbName, "failed to delete data with proto message and enum using DML")
 	assertContains(t, out, "1 record(s) deleted")
 
-	dbName = "projects/span-cloud-testing/instances/go-int-test-proto-col-samples/databases/singer_null_proto_db"
+	out = runSample(t, deleteDataWithProtoMsgAndEnumUsingMutation, dbName, "failed to delete data with proto message and enum using Mutation")
+	assertContains(t, out, "All record(s) deleted from Singers table")
+
+	//dbName = "projects/span-cloud-testing/instances/go-int-test-proto-col-samples/databases/singer_null_proto_db"
 
 	out = runSample(t, insertDataWithProtoMsgAndEnumNullValues, dbName, "failed to insert null data with NullProtoMessage and NullProtoEnum")
 	assertContains(t, out, "Inserted null data to SingerInfo and SingerGenre columns")
@@ -426,7 +442,7 @@ func TestProtoSample(t *testing.T) {
 	assertContains(t, out, "3 Singer3")
 	assertContains(t, out, "4 Singer4")
 
-	dbName = "projects/span-cloud-testing/instances/go-int-test-proto-col-samples/databases/singer_array_proto_db"
+	//dbName = "projects/span-cloud-testing/instances/go-int-test-proto-col-samples/databases/singer_array_proto_db"
 	out = runSample(t, insertDataWithArrayOfProtoMsgAndEnum, dbName, "failed to insert data with array of proto message and enum")
 	assertContains(t, out, "Inserted array of protos data to SingerInfo and SingerGenre columns")
 
@@ -1138,6 +1154,16 @@ func mustRunSample(t *testing.T, f sampleFuncWithContext, dbName, errMsg string)
 	return b.String()
 }
 
+func mustRunProtoSample(t *testing.T, f sampleProtoFuncWithContext, r io.Reader, dbName, errMsg string) string {
+	var b bytes.Buffer
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+	if err := f(ctx, &b, r, dbName); err != nil {
+		t.Fatalf("%s: %v", errMsg, err)
+	}
+	return b.String()
+}
+
 func createTestInstance(t *testing.T, projectID string, instanceConfigName string) (instanceName string, cleanup func()) {
 	ctx := context.Background()
 	instanceID := fmt.Sprintf("go-sample-%s", uuid.New().String()[:16])
@@ -1234,7 +1260,7 @@ func createTestPgDatabase(db string, extraStatements ...string) (func(), error) 
 
 	opCreate, err := client.CreateDatabase(ctx, &adminpb.CreateDatabaseRequest{
 		Parent:          m[1],
-		DatabaseDialect: adminpb.DatabaseDialect_POSTGRESQL,
+		DatabaseDialect: databasepb.DatabaseDialect(adminpb.DatabaseDialect_POSTGRESQL),
 		CreateStatement: `CREATE DATABASE "` + m[2] + `"`,
 	})
 	if err != nil {

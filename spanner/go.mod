@@ -46,3 +46,6 @@ require (
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 )
+
+// In local, uncomment the below and point to google-cloud-go with Proto DDL support
+replace cloud.google.com/go/spanner => ../../google-cloud-go-changes/google-cloud-go-proto-support-v4/spanner
