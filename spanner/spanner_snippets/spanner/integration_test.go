@@ -37,6 +37,7 @@ import (
 	"github.com/GoogleCloudPlatform/golang-samples/internal/testutil"
 	"github.com/google/uuid"
 	"google.golang.org/api/iterator"
+	"google.golang.org/api/option"
 	adminpb "google.golang.org/genproto/googleapis/spanner/admin/database/v1"
 	instancepb "google.golang.org/genproto/googleapis/spanner/admin/instance/v1"
 	"google.golang.org/grpc/codes"
@@ -1168,11 +1169,14 @@ func createTestInstance(t *testing.T, projectID string, instanceConfigName strin
 	ctx := context.Background()
 	instanceID := fmt.Sprintf("go-sample-%s", uuid.New().String()[:16])
 	instanceName = fmt.Sprintf("projects/%s/instances/%s", projectID, instanceID)
-	instanceAdmin, err := instance.NewInstanceAdminClient(ctx)
+	// TODO(sriharshach): Remove endpoint
+	endpoint := "staging-wrenchworks.sandbox.googleapis.com:443"
+	instanceAdmin, err := instance.NewInstanceAdminClient(ctx, option.WithEndpoint(endpoint))
 	if err != nil {
 		t.Fatalf("failed to create InstanceAdminClient: %v", err)
 	}
-	databaseAdmin, err := database.NewDatabaseAdminClient(ctx)
+	// TODO(sriharshach): Remove endpoint
+	databaseAdmin, err := database.NewDatabaseAdminClient(ctx, option.WithEndpoint(endpoint))
 	if err != nil {
 		t.Fatalf("failed to create DatabaseAdminClient: %v", err)
 	}
@@ -1260,7 +1264,7 @@ func createTestPgDatabase(db string, extraStatements ...string) (func(), error) 
 
 	opCreate, err := client.CreateDatabase(ctx, &adminpb.CreateDatabaseRequest{
 		Parent:          m[1],
-		DatabaseDialect: databasepb.DatabaseDialect(adminpb.DatabaseDialect_POSTGRESQL),
+		DatabaseDialect: adminpb.DatabaseDialect_POSTGRESQL,
 		CreateStatement: `CREATE DATABASE "` + m[2] + `"`,
 	})
 	if err != nil {

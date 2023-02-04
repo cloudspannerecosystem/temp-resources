@@ -33,7 +33,8 @@ func createDatabaseWithProtoDescriptor(ctx context.Context, w io.Writer, r io.Re
 	}
 
 	endpoint := "staging-wrenchworks.sandbox.googleapis.com:443"
-	adminClient, err := database.NewDatabaseAdminClient(ctx, option.WithEndpoint(endpoint))
+	// TODO(harsha): Replace below by NewDatabaseAdminClient once visibility label TRUSTED_TESTER_PROTO is removed before GA
+	adminClient, err := database.NewDatabaseAdminRESTClient(ctx, option.WithEndpoint(endpoint))
 	if err != nil {
 		return err
 	}
