@@ -36,7 +36,7 @@ func readDataWithArrayOfProtoMsgAndEnum(w io.Writer, db string) error {
 	}
 	defer client.Close()
 
-	iter := client.Single().Read(ctx, "Singers", spanner.AllKeys(),
+	iter := client.Single().Read(ctx, "SingersArray", spanner.AllKeys(),
 		[]string{"SingerId", "FirstName", "LastName", "SingerInfo", "SingerGenre"})
 	defer iter.Stop()
 	for {

@@ -38,7 +38,7 @@ func readOnlyTransactionWithArrayOfProtoMsgAndEnum(w io.Writer, db string) error
 
 	ro := client.ReadOnlyTransaction()
 	defer ro.Close()
-	stmt := spanner.Statement{SQL: `SELECT SingerId, FirstName, LastName, SingerInfo, SingerGenre FROM Singers`}
+	stmt := spanner.Statement{SQL: `SELECT SingerId, FirstName, LastName, SingerInfo, SingerGenre FROM SingersArray`}
 	iter := ro.Query(ctx, stmt)
 	defer iter.Stop()
 	var (
@@ -62,7 +62,7 @@ func readOnlyTransactionWithArrayOfProtoMsgAndEnum(w io.Writer, db string) error
 		fmt.Fprintf(w, "%d %s %s %v %s\n", singerId, firstName, lastName, singerInfo, singerGenre)
 	}
 
-	iter = ro.Read(ctx, "Singers", spanner.AllKeys(), []string{"SingerId", "FirstName", "LastName", "SingerInfo", "SingerGenre"})
+	iter = ro.Read(ctx, "SingersArray", spanner.AllKeys(), []string{"SingerId", "FirstName", "LastName", "SingerInfo", "SingerGenre"})
 	defer iter.Stop()
 	for {
 		row, err := iter.Next()

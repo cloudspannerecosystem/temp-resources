@@ -21,6 +21,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -35,6 +36,7 @@ import (
 	"github.com/GoogleCloudPlatform/golang-samples/internal/testutil"
 	"github.com/google/uuid"
 	"google.golang.org/api/iterator"
+	"google.golang.org/api/option"
 	adminpb "google.golang.org/genproto/googleapis/spanner/admin/database/v1"
 	instancepb "google.golang.org/genproto/googleapis/spanner/admin/instance/v1"
 	"google.golang.org/grpc/codes"
@@ -43,6 +45,7 @@ import (
 
 type sampleFunc func(w io.Writer, dbName string) error
 type sampleFuncWithContext func(ctx context.Context, w io.Writer, dbName string) error
+type sampleProtoFuncWithContext func(ctx context.Context, w io.Writer, r io.Reader, dbName string) error
 type instanceSampleFunc func(w io.Writer, projectID, instanceID string) error
 type backupSampleFunc func(ctx context.Context, w io.Writer, dbName, backupID string) error
 type backupSampleFuncWithoutContext func(w io.Writer, dbName, backupID string) error
@@ -379,13 +382,20 @@ func TestSample(t *testing.T) {
 	assertContains(t, out, "The venue details for venue id 19")
 }
 
-func TestProtoSample(t *testing.T) {
+func TestProtoColumnSample(t *testing.T) {
 	_ = testutil.SystemTest(t)
 	t.Parallel()
 
 	_, dbName, cleanup := initTest(t, randomID())
 	defer cleanup()
-	dbName = "projects/span-cloud-testing/instances/go-int-test-proto-col-samples/databases/singer_proto_db"
+	file, err := os.Open(filepath.Join("testdata", "protos", "descriptors.pb"))
+	if err != nil {
+		panic(err)
+	}
+	defer file.Close()
+
+	mustRunProtoSample(t, createDatabaseWithProtoDescriptor, file, dbName, "failed to create db for proto columns")
+	runSample(t, getDatabaseDdlProtoDescriptor, dbName, "failed to get database ddl for proto columns")
 
 	var out string
 	out = runSample(t, insertDataWithProtoMsgAndEnum, dbName, "failed to insert data with proto message and enum")
@@ -409,7 +419,8 @@ func TestProtoSample(t *testing.T) {
 	out = runSample(t, deleteDataWithProtoMsgAndEnumUsingDML, dbName, "failed to delete data with proto message and enum using DML")
 	assertContains(t, out, "1 record(s) deleted")
 
-	dbName = "projects/span-cloud-testing/instances/go-int-test-proto-col-samples/databases/singer_null_proto_db"
+	out = runSample(t, deleteDataWithProtoMsgAndEnumUsingMutation, dbName, "failed to delete data with proto message and enum using Mutation")
+	assertContains(t, out, "All record(s) deleted from Singers table")
 
 	out = runSample(t, insertDataWithProtoMsgAndEnumNullValues, dbName, "failed to insert null data with NullProtoMessage and NullProtoEnum")
 	assertContains(t, out, "Inserted null data to SingerInfo and SingerGenre columns")
@@ -426,7 +437,6 @@ func TestProtoSample(t *testing.T) {
 	assertContains(t, out, "3 Singer3")
 	assertContains(t, out, "4 Singer4")
 
-	dbName = "projects/span-cloud-testing/instances/go-int-test-proto-col-samples/databases/singer_array_proto_db"
 	out = runSample(t, insertDataWithArrayOfProtoMsgAndEnum, dbName, "failed to insert data with array of proto message and enum")
 	assertContains(t, out, "Inserted array of protos data to SingerInfo and SingerGenre columns")
 
@@ -1138,15 +1148,28 @@ func mustRunSample(t *testing.T, f sampleFuncWithContext, dbName, errMsg string)
 	return b.String()
 }
 
+func mustRunProtoSample(t *testing.T, f sampleProtoFuncWithContext, r io.Reader, dbName, errMsg string) string {
+	var b bytes.Buffer
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+	if err := f(ctx, &b, r, dbName); err != nil {
+		t.Fatalf("%s: %v", errMsg, err)
+	}
+	return b.String()
+}
+
 func createTestInstance(t *testing.T, projectID string, instanceConfigName string) (instanceName string, cleanup func()) {
 	ctx := context.Background()
 	instanceID := fmt.Sprintf("go-sample-%s", uuid.New().String()[:16])
 	instanceName = fmt.Sprintf("projects/%s/instances/%s", projectID, instanceID)
-	instanceAdmin, err := instance.NewInstanceAdminClient(ctx)
+	// TODO(sriharshach): Remove endpoint
+	endpoint := "staging-wrenchworks.sandbox.googleapis.com:443"
+	instanceAdmin, err := instance.NewInstanceAdminClient(ctx, option.WithEndpoint(endpoint))
 	if err != nil {
 		t.Fatalf("failed to create InstanceAdminClient: %v", err)
 	}
-	databaseAdmin, err := database.NewDatabaseAdminClient(ctx)
+	// TODO(sriharshach): Remove endpoint
+	databaseAdmin, err := database.NewDatabaseAdminClient(ctx, option.WithEndpoint(endpoint))
 	if err != nil {
 		t.Fatalf("failed to create DatabaseAdminClient: %v", err)
 	}

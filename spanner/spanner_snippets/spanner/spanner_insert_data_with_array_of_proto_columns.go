@@ -66,9 +66,9 @@ func insertDataWithArrayOfProtoMsgAndEnum(w io.Writer, db string) error {
 
 	cols := []string{"SingerId", "FirstName", "LastName", "SingerInfo", "SingerGenre"}
 	m := []*spanner.Mutation{
-		spanner.InsertOrUpdate("Singers", cols, []interface{}{1, "Singer1", "Singer1", singerInfoArray, singerGenreArray}),
-		spanner.InsertOrUpdate("Singers", cols, []interface{}{2, "Singer2", "Singer2", singerInfoNilArray, singerGenreNilArray}),
-		spanner.InsertOrUpdate("Singers", cols, []interface{}{3, "Singer3", "Singer3", singerInfoEmptyArray, singerGenreEmptyArray}),
+		spanner.InsertOrUpdate("SingersArray", cols, []interface{}{1, "Singer1", "Singer1", singerInfoArray, singerGenreArray}),
+		spanner.InsertOrUpdate("SingersArray", cols, []interface{}{2, "Singer2", "Singer2", singerInfoNilArray, singerGenreNilArray}),
+		spanner.InsertOrUpdate("SingersArray", cols, []interface{}{3, "Singer3", "Singer3", singerInfoEmptyArray, singerGenreEmptyArray}),
 	}
 
 	_, err = client.Apply(ctx, m)
