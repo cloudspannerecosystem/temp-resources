@@ -33,18 +33,11 @@ func createDatabaseWithProtoDescriptor(ctx context.Context, w io.Writer, r io.Re
 	}
 
 	endpoint := "staging-wrenchworks.sandbox.googleapis.com:443"
-	// TODO(harsha): Replace below by NewDatabaseAdminClient once visibility label TRUSTED_TESTER_PROTO is removed before GA
-	adminClient, err := database.NewDatabaseAdminRESTClient(ctx, option.WithEndpoint(endpoint))
+	adminClient, err := database.NewDatabaseAdminClient(ctx, option.WithEndpoint(endpoint))
 	if err != nil {
 		return err
 	}
 	defer adminClient.Close()
-
-	/*Reading proto descriptor directly
-	descriptor, err := os.ReadFile("/usr/local/google/home/sriharshach/github/Go/golang-samples-proto-support-v2/spanner/spanner_snippets/spanner/testdata/protos/descriptor.pb")
-	if err != nil {
-		return err
-	}*/
 
 	protoFileDescriptor, err := io.ReadAll(r)
 	if err != nil {

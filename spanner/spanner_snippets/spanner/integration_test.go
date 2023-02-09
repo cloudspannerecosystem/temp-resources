@@ -32,7 +32,6 @@ import (
 	"cloud.google.com/go/kms/apiv1/kmspb"
 	"cloud.google.com/go/spanner"
 	database "cloud.google.com/go/spanner/admin/database/apiv1"
-	"cloud.google.com/go/spanner/admin/database/apiv1/databasepb"
 	instance "cloud.google.com/go/spanner/admin/instance/apiv1"
 	"github.com/GoogleCloudPlatform/golang-samples/internal/testutil"
 	"github.com/google/uuid"
@@ -383,23 +382,20 @@ func TestSample(t *testing.T) {
 	assertContains(t, out, "The venue details for venue id 19")
 }
 
-func TestProtoSample(t *testing.T) {
+func TestProtoColumnSample(t *testing.T) {
 	_ = testutil.SystemTest(t)
 	t.Parallel()
 
 	_, dbName, cleanup := initTest(t, randomID())
 	defer cleanup()
-	//dbName = "projects/span-cloud-testing/instances/go-int-test-proto-col-samples/databases/singer_proto_db"
-	//dbName = "projects/span-cloud-testing/instances/harsha-test-gcloud/databases/singer_test"
-	//dbName = "projects/span-cloud-testing/instances/integration-test-proto-column/databases/int_test_proto_column_db"
-	//f, err := os.Open("/usr/local/google/home/sriharshach/github/Go/golang-samples-proto-support-v2/spanner/spanner_snippets/spanner/testdata/protos/descriptors.pb")
 	file, err := os.Open(filepath.Join("testdata", "protos", "descriptors.pb"))
 	if err != nil {
 		panic(err)
 	}
 	defer file.Close()
 
-	mustRunProtoSample(t, createDatabaseWithProtoDescriptor, file, dbName, "failed to create db")
+	mustRunProtoSample(t, createDatabaseWithProtoDescriptor, file, dbName, "failed to create db for proto columns")
+	runSample(t, getDatabaseDdlProtoDescriptor, dbName, "failed to get database ddl for proto columns")
 
 	var out string
 	out = runSample(t, insertDataWithProtoMsgAndEnum, dbName, "failed to insert data with proto message and enum")
@@ -426,8 +422,6 @@ func TestProtoSample(t *testing.T) {
 	out = runSample(t, deleteDataWithProtoMsgAndEnumUsingMutation, dbName, "failed to delete data with proto message and enum using Mutation")
 	assertContains(t, out, "All record(s) deleted from Singers table")
 
-	//dbName = "projects/span-cloud-testing/instances/go-int-test-proto-col-samples/databases/singer_null_proto_db"
-
 	out = runSample(t, insertDataWithProtoMsgAndEnumNullValues, dbName, "failed to insert null data with NullProtoMessage and NullProtoEnum")
 	assertContains(t, out, "Inserted null data to SingerInfo and SingerGenre columns")
 
@@ -443,7 +437,6 @@ func TestProtoSample(t *testing.T) {
 	assertContains(t, out, "3 Singer3")
 	assertContains(t, out, "4 Singer4")
 
-	//dbName = "projects/span-cloud-testing/instances/go-int-test-proto-col-samples/databases/singer_array_proto_db"
 	out = runSample(t, insertDataWithArrayOfProtoMsgAndEnum, dbName, "failed to insert data with array of proto message and enum")
 	assertContains(t, out, "Inserted array of protos data to SingerInfo and SingerGenre columns")
 

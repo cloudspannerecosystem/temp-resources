@@ -23,6 +23,7 @@ import (
 
 	database "cloud.google.com/go/spanner/admin/database/apiv1"
 	adminpb "cloud.google.com/go/spanner/admin/database/apiv1/databasepb"
+	"google.golang.org/api/option"
 )
 
 // getDatabaseDdlProtoDescriptor gets the DDL for the database with proto descriptors
@@ -33,8 +34,9 @@ func getDatabaseDdlProtoDescriptor(w io.Writer, db string) error {
 		return fmt.Errorf("getDatabaseDdl: invalid database id %s", db)
 	}
 
+	endpoint := "staging-wrenchworks.sandbox.googleapis.com:443"
 	ctx := context.Background()
-	adminClient, err := database.NewDatabaseAdminClient(ctx)
+	adminClient, err := database.NewDatabaseAdminClient(ctx, option.WithEndpoint(endpoint))
 	if err != nil {
 		return err
 	}
@@ -49,7 +51,7 @@ func getDatabaseDdlProtoDescriptor(w io.Writer, db string) error {
 	}
 
 	fmt.Fprintf(w, "Database DDL is as follows: \n [%v]", op.GetStatements())
-	fmt.Fprintf(w, "Database Proto Descriptor is as follows: \n [%v]", op.GetProtoDescriptors())
+	fmt.Fprintf(w, "Database Proto Descriptor is as follows: \n [%v]", string(op.GetProtoDescriptors()))
 
 	return nil
 }
