@@ -44,7 +44,22 @@ type Singer struct {
 }
 
 func (s *Singer) toMutation() (*spanner.Mutation, error) {
-	return spanner.InsertOrUpdateStruct("Singers", s)
+	type singer struct {
+		Id        string
+		FirstName string `spanner:"first_name"`
+		LastName  string `spanner:"last_name"`
+		Active    bool
+		CreatedAt time.Time `spanner:"created_at"`
+		UpdatedAt time.Time `spanner:"updated_at"`
+	}
+	return spanner.InsertOrUpdateStruct("Singers", &singer{
+		Id:        s.ID,
+		FirstName: s.FirstName.String,
+		LastName:  s.LastName,
+		CreatedAt: s.CreatedAt,
+		UpdatedAt: s.UpdatedAt,
+		Active:    s.Active,
+	})
 }
 
 type Album struct {
@@ -317,7 +332,7 @@ type queryerSql interface {
 func selectRandomSingerDatabaseSQL(db queryerSql, ids []string, rnd *rand.Rand) (*Singer, error) {
 	var s Singer
 	row := db.QueryRowContext(context.Background(), "SELECT * FROM Singers WHERE Id=@id", ids[rnd.Intn(len(ids))])
-	return &s, row.Scan(&s.ID, &s.FirstName, &s.LastName, &s.FullName, &s.Active)
+	return &s, row.Scan(&s.ID, &s.CreatedAt, &s.UpdatedAt, &s.FirstName, &s.LastName, &s.FullName, &s.Active)
 }
 
 func updateSingerUsingMutationDatabaseSQL(conn *sql.Conn, s *Singer) error {
