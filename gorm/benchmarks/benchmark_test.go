@@ -3,8 +3,8 @@ package benchmarks
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
-	"github.com/google/uuid"
 	"math/rand"
 	"os"
 	"testing"
@@ -12,7 +12,9 @@ import (
 
 	"cloud.google.com/go/spanner"
 	database "cloud.google.com/go/spanner/admin/database/apiv1"
+	"github.com/google/uuid"
 	_ "github.com/googleapis/go-sql-spanner"
+	spannerdriver "github.com/googleapis/go-sql-spanner"
 	"google.golang.org/grpc/codes"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
@@ -41,6 +43,10 @@ type Singer struct {
 	Albums    []Album
 }
 
+func (s *Singer) toMutation() (*spanner.Mutation, error) {
+	return spanner.InsertOrUpdateStruct("Singers", s)
+}
+
 type Album struct {
 	BaseModel
 	Title        string
@@ -58,6 +64,99 @@ func TestMain(m *testing.M) {
 	}
 	res := m.Run()
 	os.Exit(res)
+}
+
+func BenchmarkSelectSingleRecordGORM(b *testing.B) {
+	db, err := gorm.Open(spannergorm.New(spannergorm.Config{
+		DriverName: "spanner",
+		DSN:        fmt.Sprintf("projects/%s/instances/%s/databases/%s", benchmarkProjectId, benchmarkInstanceId, benchmarkDatabaseId),
+	}), &gorm.Config{PrepareStmt: true})
+	if err != nil {
+		b.Fatalf("failed to open database connection: %v\n", err)
+	}
+	rnd := rand.New(rand.NewSource(time.Now().UnixNano()))
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		if _, err := selectRandomSinger(db, allIds, rnd); err != nil {
+			b.Fatalf("failed to select singer: %v", err)
+		}
+	}
+}
+
+func BenchmarkSelectAndUpdateUsingMutationGORM(b *testing.B) {
+	db, err := gorm.Open(spannergorm.New(spannergorm.Config{
+		DriverName: "spanner",
+		DSN:        fmt.Sprintf("projects/%s/instances/%s/databases/%s", benchmarkProjectId, benchmarkInstanceId, benchmarkDatabaseId),
+	}), &gorm.Config{PrepareStmt: true})
+	if err != nil {
+		b.Fatalf("failed to open database connection: %v\n", err)
+	}
+	rnd := rand.New(rand.NewSource(time.Now().UnixNano()))
+	b.ResetTimer()
+
+	ctx := context.Background()
+	for i := 0; i < b.N; i++ {
+		databaseSQL, _ := db.DB()
+		conn, _ := databaseSQL.Conn(ctx)
+		tx, err := conn.BeginTx(ctx, &sql.TxOptions{})
+		if err != nil {
+			b.Fatalf("failed to begin transaction: %v", err)
+		}
+		singer, err := selectRandomSingerDatabaseSQL(tx, allIds, rnd)
+		if err != nil {
+			b.Fatalf("failed to query singer: %v", err)
+		}
+		singer.LastName = uuid.New().String()
+		if err := updateSingerUsingMutationDatabaseSQL(conn, singer); err != nil {
+			b.Fatalf("failed to update singer: %v", err)
+		}
+		if err := tx.Commit(); err != nil {
+			b.Fatalf("failed to commit: %v", err)
+		}
+		_ = conn.Close()
+	}
+}
+
+func BenchmarkSelectAndUpdateUsingDmlGORM(b *testing.B) {
+	db, err := gorm.Open(spannergorm.New(spannergorm.Config{
+		DriverName: "spanner",
+		DSN:        fmt.Sprintf("projects/%s/instances/%s/databases/%s", benchmarkProjectId, benchmarkInstanceId, benchmarkDatabaseId),
+	}), &gorm.Config{PrepareStmt: true})
+	if err != nil {
+		b.Fatalf("failed to open database connection: %v\n", err)
+	}
+	rnd := rand.New(rand.NewSource(time.Now().UnixNano()))
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if err := db.Transaction(func(tx *gorm.DB) error {
+			singer, err := selectRandomSinger(tx, allIds, rnd)
+			if err != nil {
+				return err
+			}
+			singer.LastName = uuid.New().String()
+			return tx.Save(singer).Error
+		}); err != nil {
+			b.Fatalf("failed to select and update using singer using dml: %v", err)
+		}
+	}
+}
+
+func BenchmarkSelect100SingersGORM(b *testing.B) {
+	db, err := gorm.Open(spannergorm.New(spannergorm.Config{
+		DriverName: "spanner",
+		DSN:        fmt.Sprintf("projects/%s/instances/%s/databases/%s", benchmarkProjectId, benchmarkInstanceId, benchmarkDatabaseId),
+	}), &gorm.Config{PrepareStmt: true})
+	if err != nil {
+		b.Fatalf("failed to open database connection: %v\n", err)
+	}
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		if err := selectRandomSingersWithClient(db, 100); err != nil {
+			b.Fatalf("failed to select 100 singers: %v", err)
+		}
+	}
 }
 
 func setup() error {
@@ -190,4 +289,43 @@ func createRandomSingerMutations(count int) ([]string, []*Singer) {
 		}
 	}
 	return ids, singers
+}
+
+func selectRandomSinger(db *gorm.DB, ids []string, rnd *rand.Rand) (*Singer, error) {
+	var s Singer
+	err := db.First(&s, "id = ?", ids[rnd.Intn(len(ids))]).Error
+	return &s, err
+}
+
+func selectRandomSingersWithClient(db *gorm.DB, count int) error {
+	var singers []Singer
+	if err := db.Raw(fmt.Sprintf("SELECT * FROM Singers TABLESAMPLE RESERVOIR (%v ROWS)", count)).Scan(&singers).Error; err != nil {
+		return err
+	}
+	if len(singers) != count {
+		return errors.New("incomplete result")
+	}
+	return nil
+}
+
+type queryerSql interface {
+	QueryRowContext(ctx context.Context, query string, args ...interface{}) *sql.Row
+
+	QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error)
+}
+
+func selectRandomSingerDatabaseSQL(db queryerSql, ids []string, rnd *rand.Rand) (*Singer, error) {
+	var s Singer
+	row := db.QueryRowContext(context.Background(), "SELECT * FROM Singers WHERE Id=@id", ids[rnd.Intn(len(ids))])
+	return &s, row.Scan(&s.ID, &s.FirstName, &s.LastName, &s.FullName, &s.Active)
+}
+
+func updateSingerUsingMutationDatabaseSQL(conn *sql.Conn, s *Singer) error {
+	m, err := s.toMutation()
+	if err != nil {
+		return err
+	}
+	return conn.Raw(func(driverConn interface{}) error {
+		return driverConn.(spannerdriver.SpannerConn).BufferWrite([]*spanner.Mutation{m})
+	})
 }
